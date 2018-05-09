@@ -17,8 +17,8 @@ def run_experiment(hparams):
     np.random.seed(1234)
     tf.set_random_seed(1234)
 
-    train_batch_size = 32
-    test_batch_size = 512
+    train_batch_size = hparams.train_batch_size
+    test_batch_size = hparams.test_batch_size
 
     with open(",".join(hparams.train_files), 'rb') as f:
       train_set = pickle.load(f)
