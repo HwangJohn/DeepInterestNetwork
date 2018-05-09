@@ -1,8 +1,5 @@
 import tensorflow as tf
 
-from tensorflow.python.ops.rnn_cell import GRUCell
-from tensorflow.python.ops.rnn_cell import LSTMCell
-from tensorflow.python.ops.rnn_cell import MultiRNNCell
 
 class Model(object):
 
