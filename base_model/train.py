@@ -70,7 +70,7 @@ def run_experiment(hparams):
       for s in score_n.tolist():
         score_arr.append([1, 0, s])
       return score_arr
-    def _eval(sess, model):
+    def _eval(sess, model, best_auc):
       auc_sum = 0.0
       score_arr = []
       for _, uij in DataInputTest(test_set, test_batch_size):
@@ -79,7 +79,6 @@ def run_experiment(hparams):
         auc_sum += auc_ * len(uij[0])
       test_gauc = auc_sum / len(test_set)
       Auc = calc_auc(score_arr)
-      global best_auc
       if best_auc < test_gauc:
         best_auc = test_gauc
         model.save(sess, hparams.job_dir)
@@ -93,7 +92,7 @@ def run_experiment(hparams):
       sess.run(tf.global_variables_initializer())
       sess.run(tf.local_variables_initializer())
 
-      print('test_gauc: %.4f\t test_auc: %.4f' % _eval(sess, model))
+      print('test_gauc: %.4f\t test_auc: %.4f' % _eval(sess, model, best_auc))
       sys.stdout.flush()
       lr = 1.0
       start_time = time.time()
@@ -108,7 +107,7 @@ def run_experiment(hparams):
           loss_sum += loss
 
           if model.global_step.eval() % 1000 == 0:
-            test_gauc, Auc = _eval(sess, model)
+            test_gauc, Auc = _eval(sess, model, best_auc)
             print('Epoch %d Global_step %d\tTrain_loss: %.4f\tEval_GAUC: %.4f\tEval_AUC: %.4f' %
                   (model.global_epoch_step.eval(), model.global_step.eval(),
                    loss_sum / 1000, test_gauc, Auc))
