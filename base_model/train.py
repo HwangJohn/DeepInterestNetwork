@@ -10,6 +10,7 @@ from input import DataInput, DataInputTest
 from model import Model
 
 from tensorflow.contrib.training.python.training import hparam
+from tensorflow.python.lib.io import file_io
 
 def run_experiment(hparams):
     os.environ['CUDA_VISIBLE_DEVICES'] = '1'
@@ -20,11 +21,19 @@ def run_experiment(hparams):
     train_batch_size = hparams.train_batch_size
     test_batch_size = hparams.test_batch_size
 
-    with open(",".join(hparams.train_files), 'rb') as f:
-      train_set = pickle.load(f)
-      test_set = pickle.load(f)
-      cate_list = pickle.load(f)
-      user_count, item_count, cate_count = pickle.load(f)
+
+
+    with file_io.FileIO(",".join(hparams.train_files), 'rb') as f:
+        train_set = pickle.load(f)
+        test_set = pickle.load(f)
+        cate_list = pickle.load(f)
+        user_count, item_count, cate_count = pickle.load(f)
+
+    # with open(",".join(hparams.train_files), 'rb') as f:
+    #   train_set = pickle.load(f)
+    #   test_set = pickle.load(f)
+    #   cate_list = pickle.load(f)
+    #   user_count, item_count, cate_count = pickle.load(f)
 
     best_auc = 0.0
     def calc_auc(raw_arr):
