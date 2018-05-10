@@ -88,8 +88,9 @@ def run_experiment(hparams):
       return test_gauc, Auc
 
 
-    gpu_options = tf.GPUOptions(allow_growth=True)
-    with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
+    # gpu_options = tf.GPUOptions(allow_growth=True)
+    config = tf.ConfigProto(allow_soft_placement=True)
+    with tf.Session(config=config) as sess:
 
       model = Model(user_count, item_count, cate_count, cate_list, hparams.variable_strategy)
       sess.run(tf.global_variables_initializer())
