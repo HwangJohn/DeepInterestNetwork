@@ -13,7 +13,8 @@ from tensorflow.contrib.training.python.training import hparam
 from tensorflow.python.lib.io import file_io
 
 def run_experiment(hparams):
-    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
     random.seed(1234)
     np.random.seed(1234)
     tf.set_random_seed(1234)
@@ -22,18 +23,11 @@ def run_experiment(hparams):
     test_batch_size = hparams.test_batch_size
 
 
-
     with file_io.FileIO(",".join(hparams.train_files), 'rb') as f:
         train_set = pickle.load(f)
         test_set = pickle.load(f)
         cate_list = pickle.load(f)
         user_count, item_count, cate_count = pickle.load(f)
-
-    # with open(",".join(hparams.train_files), 'rb') as f:
-    #   train_set = pickle.load(f)
-    #   test_set = pickle.load(f)
-    #   cate_list = pickle.load(f)
-    #   user_count, item_count, cate_count = pickle.load(f)
 
     best_auc = 0.0
     def calc_auc(raw_arr):
@@ -97,7 +91,7 @@ def run_experiment(hparams):
     gpu_options = tf.GPUOptions(allow_growth=True)
     with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
 
-      model = Model(user_count, item_count, cate_count, cate_list)
+      model = Model(user_count, item_count, cate_count, cate_list, hparams.variable_strategy)
       sess.run(tf.global_variables_initializer())
       sess.run(tf.local_variables_initializer())
 
@@ -112,7 +106,9 @@ def run_experiment(hparams):
         epoch_size = round(len(train_set) / train_batch_size)
         loss_sum = 0.0
         for _, uij in DataInput(train_set, train_batch_size):
-          loss = model.train(sess, uij, lr)
+
+          loss = model.train(sess, uij, lr, hparams.variable_strategy)
+
           loss_sum += loss
 
           if model.global_step.eval() % 1000 == 0:
@@ -160,6 +156,12 @@ if __name__ == '__main__':
         '--job-dir',
         help='GCS location to write checkpoints and export models',
         required=True
+    )
+    parser.add_argument(
+        '--variable-strategy',
+        help='Where to locate variable operations',
+        type=str,
+        default='CPU'
     )
 
     parser.add_argument(
