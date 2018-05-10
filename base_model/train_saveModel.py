@@ -12,6 +12,7 @@ from model import Model
 from tensorflow.contrib.training.python.training import hparam
 from tensorflow.python.lib.io import file_io
 
+
 def run_experiment(hparams):
     # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
@@ -21,7 +22,6 @@ def run_experiment(hparams):
 
     train_batch_size = hparams.train_batch_size
     test_batch_size = hparams.test_batch_size
-
 
     with file_io.FileIO(",".join(hparams.train_files), 'rb') as f:
         train_set = pickle.load(f)
@@ -87,20 +87,103 @@ def run_experiment(hparams):
         model.save(sess, hparams.job_dir)
       return test_gauc, Auc
 
+    def _evalGlobal(sess, model, best_auc, uij, lr, logits_all):
+        auc_sum = 0.0
+        score_arr = []
+        for _, uij in DataInputTest(test_set, test_batch_size):
+            auc_, score_ = model.eval(sess, uij)
+            score_arr += _auc_arr(score_)
+            auc_sum += auc_ * len(uij[0])
+        test_gauc = auc_sum / len(test_set)
+        Auc = calc_auc(score_arr)
+        if best_auc < test_gauc:
+            best_auc = test_gauc
+            # model.save(sess, hparams.job_dir)
+            tf.saved_model.simple_save(
+                sess,
+                hparams.job_dir,
+                inputs={'u': uij[0],'hist_i': uij[3], 'sl': lr},
+                outputs={'logits_all':logits_all[0]}
+            )
+        return test_gauc, Auc
+
+    def build_i_map(keys):
+        """
+        Make inverse map for keys: i -> item
+        :param keys: listing items in order.
+        :return:
+        """
+        return dict(zip(range(len(keys), keys)))
+
+    def restore_info(uij, predicted, dic):
+        iu, ii, _, ihist_i, _ = uij
+
+        u = dic['deal_key'][iu]
+        for i in range(len(iu[0])):
+            u = dic['deal_key'][iu[i]]
+
+    def _predict(sess):
+        with file_io.FileIO(",".join(hparams.train_files), 'rb') as f:
+            wepick_data = pickle.load(f)
+
+        total_model = 0
+        total_time = 0
+        start = time.time()
+
+        with file_io.FileIO(",".join(hparams.pred_out_path), 'w') as pred_f:
+            for _, uij in DataInputTest(test_set, test_batch_size):
+                outputs = []
+                inf_start = time.time()
+                users, histories, lengths = uij[0], uij[3], uij[4]
+                predicted = model.test(sess, users, histories, lengths)
+                inf_end = time.time()
+                total_model += inf_end - inf_start
+
+                for k in range(len(users)):
+                    u = wepick_data['user_key'][users[k]]
+                    hist = list(map(lambda x: wepick_data['deal_key'][x], histories[k][0:lengths[k]]))
+                    sort_i = np.argsort(predicted[k,:])
+                    sort_i = np.fliplr([sort_i])[0]
+                    order = list(map(lambda x: (wepick_data['deal_key'][x], predicted[k, x]), sort_i))
+                    outputs.append((u, hist, order))
+
+                for u, hist, order in outputs:
+                    h = '-'.join(map(lambda x: str(x), hist))
+                    s = ':'.join(map(lambda x: "{}/{:.2f}".format(x[0], x[1]), order[:30]))
+                    pred_f.write("{},{},{}\n".format(u, h, s))
+
+        total_time += (time.time() - start)
+        sys.stderr.wirte("Elapsed total {}: model {}\n".format(total_time, total_model))
+
+    def restore(sess, path):
+        saver = tf.train.Saver()
+        saver.restore(sess, save_path=path)
+
+
+    model = Model(user_count, item_count, cate_count, cate_list, hparams.variable_strategy)
+
 
     # gpu_options = tf.GPUOptions(allow_growth=True)
     config = tf.ConfigProto(allow_soft_placement=True)
     with tf.Session(config=config) as sess:
 
-      model = Model(user_count, item_count, cate_count, cate_list, hparams.variable_strategy)
+      if hparams.run_mode == "test":
+
+        restore(sess, hparams.job_dir)
+        _predict(sess)
+        return 0
+
       sess.run(tf.global_variables_initializer())
       sess.run(tf.local_variables_initializer())
+
+      writer = tf.summary.FileWriter('log', sess.graph)
 
       print('test_gauc: %.4f\t test_auc: %.4f' % _eval(sess, model, best_auc))
       sys.stdout.flush()
       lr = 1.0
       start_time = time.time()
-      for _ in range(50):
+      # for _ in range(50):
+      for _ in range(5):
 
         random.shuffle(train_set)
 
@@ -113,7 +196,7 @@ def run_experiment(hparams):
           loss_sum += loss
 
           if model.global_step.eval() % 1000 == 0:
-            test_gauc, Auc = _eval(sess, model, best_auc)
+            test_gauc, Auc = _evalGlobal(sess, model, best_auc, uij, lr, logits_all)
             print('Epoch %d Global_step %d\tTrain_loss: %.4f\tEval_GAUC: %.4f\tEval_AUC: %.4f' %
                   (model.global_epoch_step.eval(), model.global_step.eval(),
                    loss_sum / 1000, test_gauc, Auc))
@@ -122,6 +205,7 @@ def run_experiment(hparams):
 
           if model.global_step.eval() % 336000 == 0:
             lr = 0.1
+
 
         print('Epoch %d DONE\tCost time: %.2f' %
               (model.global_epoch_step.eval(), time.time()-start_time))
@@ -135,6 +219,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # Input Arguments
+    parser.add_argument(
+        '--run-mode',
+        help='train or test',
+        type=str,
+        default='train'
+    )
     parser.add_argument(
         '--train-files',
         help='GCS or local paths to training data',
@@ -163,6 +253,12 @@ if __name__ == '__main__':
         help='Where to locate variable operations',
         type=str,
         default='CPU'
+    )
+    parser.add_argument(
+        '--pred-out-path',
+        help='Where to locate predicted result',
+        nargs="+",
+        required=False
     )
 
     parser.add_argument(

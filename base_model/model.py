@@ -129,7 +129,7 @@ class Model(object):
 
   def train(self, sess, uij, l, variable_strategy):
     with tf.device('/device:'+variable_strategy+':0'):
-        loss, _ = sess.run([self.loss, self.train_op], feed_dict={
+        loss, logits_all, _ = sess.run([self.loss, self.logits_all, self.train_op], feed_dict={
             self.u: uij[0],
             self.i: uij[1],
             self.y: uij[2],
@@ -137,7 +137,7 @@ class Model(object):
             self.sl: uij[4],
             self.lr: l,
             })
-    return loss
+    return loss, logits_all
 
   def eval(self, sess, uij):
     u_auc, socre_p_and_n = sess.run([self.mf_auc, self.p_and_n], feed_dict={
