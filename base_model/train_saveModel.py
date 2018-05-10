@@ -87,25 +87,21 @@ def run_experiment(hparams):
         model.save(sess, hparams.job_dir)
       return test_gauc, Auc
 
-    def _evalGlobal(sess, model, best_auc, uij, lr, logits_all):
-        auc_sum = 0.0
-        score_arr = []
-        for _, uij in DataInputTest(test_set, test_batch_size):
-            auc_, score_ = model.eval(sess, uij)
-            score_arr += _auc_arr(score_)
-            auc_sum += auc_ * len(uij[0])
-        test_gauc = auc_sum / len(test_set)
-        Auc = calc_auc(score_arr)
-        if best_auc < test_gauc:
-            best_auc = test_gauc
-            # model.save(sess, hparams.job_dir)
-            tf.saved_model.simple_save(
-                sess,
-                hparams.job_dir,
-                inputs={'u': uij[0],'hist_i': uij[3], 'sl': lr},
-                outputs={'logits_all':logits_all[0]}
-            )
-        return test_gauc, Auc
+    def _export(sess, uij, lr, logits_all, path):
+
+        saver = tf.train.Saver()
+        saver.restore(sess, save_path=path)
+
+        tf.saved_model.simple_save(
+            sess,
+            hparams.export_dir,
+            inputs={
+                'u': tf.convert_to_tensor(uij[0], dtype=tf.float16),
+                'hist_i': tf.convert_to_tensor(uij[3], dtype=tf.float16),
+                'sl': tf.convert_to_tensor(lr, dtype=tf.float16)
+            },
+            outputs={'logits_all': tf.convert_to_tensor(logits_all, dtype=tf.float16)}
+        )
 
     def build_i_map(keys):
         """
@@ -196,7 +192,7 @@ def run_experiment(hparams):
           loss_sum += loss
 
           if model.global_step.eval() % 1000 == 0:
-            test_gauc, Auc = _evalGlobal(sess, model, best_auc, uij, lr, logits_all)
+            test_gauc, Auc = _eval(sess, model)
             print('Epoch %d Global_step %d\tTrain_loss: %.4f\tEval_GAUC: %.4f\tEval_AUC: %.4f' %
                   (model.global_epoch_step.eval(), model.global_step.eval(),
                    loss_sum / 1000, test_gauc, Auc))
@@ -213,6 +209,7 @@ def run_experiment(hparams):
         model.global_epoch_step_op.eval()
 
       print('best test_gauc:', best_auc)
+      _export(sess, uij, lr, logits_all, hparams.job_dir)
       sys.stdout.flush()
 
 if __name__ == '__main__':
@@ -246,6 +243,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--job-dir',
         help='GCS location to write checkpoints and export models',
+        required=True
+    )
+    parser.add_argument(
+        '--export-dir',
+        help='Where to locate savedModel result',
         required=True
     )
     parser.add_argument(
