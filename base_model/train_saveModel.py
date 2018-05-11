@@ -201,13 +201,13 @@ def run_experiment(hparams):
 
           if model.global_step.eval() % 336000 == 0:
             lr = 0.1
-
+        break
 
         print('Epoch %d DONE\tCost time: %.2f' %
               (model.global_epoch_step.eval(), time.time()-start_time))
         sys.stdout.flush()
         model.global_epoch_step_op.eval()
-        break
+
 
       print('best test_gauc:', best_auc)
       _export(sess, uij, lr, logits_all, hparams.job_dir)
