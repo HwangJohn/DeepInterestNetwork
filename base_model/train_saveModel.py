@@ -207,6 +207,7 @@ def run_experiment(hparams):
               (model.global_epoch_step.eval(), time.time()-start_time))
         sys.stdout.flush()
         model.global_epoch_step_op.eval()
+        break
 
       print('best test_gauc:', best_auc)
       _export(sess, uij, lr, logits_all, hparams.job_dir)
