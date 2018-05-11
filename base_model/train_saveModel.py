@@ -188,8 +188,7 @@ def run_experiment(hparams):
       sys.stdout.flush()
       lr = 1.0
       start_time = time.time()
-      # for _ in range(50):
-      for _ in range(1):
+      for _ in range(50):
 
         random.shuffle(train_set)
 
@@ -212,7 +211,6 @@ def run_experiment(hparams):
           if model.global_step.eval() % 336000 == 0:
             lr = 0.1
 
-          break
 
         print('Epoch %d DONE\tCost time: %.2f' %
               (model.global_epoch_step.eval(), time.time()-start_time))
