@@ -89,8 +89,8 @@ def run_experiment(hparams):
 
     def _export(sess, uij, lr, logits_all, path):
 
-        saver = tf.train.Saver()
-        saver.restore(sess, save_path=path)
+        # saver = tf.train.Saver()
+        # saver.restore(sess, save_path=path)
 
         tf.saved_model.simple_save(
             sess,
@@ -179,7 +179,7 @@ def run_experiment(hparams):
       lr = 1.0
       start_time = time.time()
       # for _ in range(50):
-      for _ in range(5):
+      for _ in range(1):
 
         random.shuffle(train_set)
 
@@ -192,7 +192,7 @@ def run_experiment(hparams):
           loss_sum += loss
 
           if model.global_step.eval() % 1000 == 0:
-            test_gauc, Auc = _eval(sess, model)
+            test_gauc, Auc = _eval(sess, model, best_auc)
             print('Epoch %d Global_step %d\tTrain_loss: %.4f\tEval_GAUC: %.4f\tEval_AUC: %.4f' %
                   (model.global_epoch_step.eval(), model.global_step.eval(),
                    loss_sum / 1000, test_gauc, Auc))
