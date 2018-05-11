@@ -92,15 +92,25 @@ def run_experiment(hparams):
         # saver = tf.train.Saver()
         # saver.restore(sess, save_path=path)
 
+        # tf.saved_model.simple_save(
+        #     sess,
+        #     hparams.export_dir,
+        #     inputs={
+        #         'u': tf.convert_to_tensor(uij[0], dtype=tf.float16),
+        #         'hist_i': tf.convert_to_tensor(uij[3], dtype=tf.float16),
+        #         'sl': tf.convert_to_tensor(lr, dtype=tf.float16)
+        #     },
+        #     outputs={'logits_all': tf.convert_to_tensor(logits_all, dtype=tf.float16)}
+        # )
         tf.saved_model.simple_save(
             sess,
             hparams.export_dir,
             inputs={
-                'u': tf.convert_to_tensor(uij[0], dtype=tf.float16),
-                'hist_i': tf.convert_to_tensor(uij[3], dtype=tf.float16),
-                'sl': tf.convert_to_tensor(lr, dtype=tf.float16)
+                'u': model.u,
+                'hist_i': model.hist_i,
+                'sl': model.sl
             },
-            outputs={'logits_all': tf.convert_to_tensor(logits_all, dtype=tf.float16)}
+            outputs={'logits_all': model.logits_all}
         )
 
     def build_i_map(keys):
@@ -201,7 +211,8 @@ def run_experiment(hparams):
 
           if model.global_step.eval() % 336000 == 0:
             lr = 0.1
-        break
+
+          break
 
         print('Epoch %d DONE\tCost time: %.2f' %
               (model.global_epoch_step.eval(), time.time()-start_time))
